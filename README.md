@@ -3,7 +3,7 @@
 Security-first local Fastlane release toolkit for **bare** React Native apps (iOS + Android).
 
 Package: [`@ahmedsamirelsaka/react-native-local-release`](https://www.npmjs.com/package/@ahmedsamirelsaka/react-native-local-release)  
-Version: **2.0.0-rc.1** (npm dist-tag `next`)
+Version: **2.0.0-rc.2** (npm dist-tag `next`)
 
 ## Supported
 
@@ -22,10 +22,10 @@ Version: **2.0.0-rc.1** (npm dist-tag `next`)
 
 ```bash
 # From your React Native app root
-npx @ahmedsamirelsaka/react-native-local-release@2.0.0-rc.1 install --project .
+npx @ahmedsamirelsaka/react-native-local-release@2.0.0-rc.2 install --project .
 
 # Prefer an exact version in package.json so daily commands do not float:
-# "devDependencies": { "@ahmedsamirelsaka/react-native-local-release": "2.0.0-rc.1" }
+# "devDependencies": { "@ahmedsamirelsaka/react-native-local-release": "2.0.0-rc.2" }
 ```
 
 Useful flags:

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.0-rc.2
+
+- Remove maintainer-only `docs/PUBLISHING.md` from the published package and GitHub tree.
+- README / docs scrubbed for public launch (no local paths or token-setup checklists).
+
 ## 2.0.0-rc.1
 
 Security-first rewrite for bare React Native apps (release candidate).
@@ -23,7 +28,7 @@ Security-first rewrite for bare React Native apps (release candidate).
 - CI: SHA-pinned actions, npm provenance publish workflow, Dependabot.
 
 ### Migration
-1. Install `2.0.0-rc.1` from npm (dist-tag `next`).
+1. Install `2.0.0-rc.2` (or newer) from npm (dist-tag `next`).
 2. Run `rn-local-release migrate --project .` (or reinstall; existing config is merged).
 3. Prefer Keychain credentials: `rn-local-release configure --project .`
 4. Confirm `.gitignore` includes `logs/`, `versions/`, and the marked credential block.
