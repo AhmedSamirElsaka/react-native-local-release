@@ -2,8 +2,8 @@
 
 Security-first local Fastlane release toolkit for **bare** React Native apps (iOS + Android).
 
-Package: `@ahmedsamirelsaka/react-native-local-release`  
-Version: **2.0.0-rc.1** (GitHub Release ready; npm `next` tag after you add `NPM_TOKEN` — see [docs/PUBLISHING.md](./docs/PUBLISHING.md))
+Package: [`@ahmedsamirelsaka/react-native-local-release`](https://www.npmjs.com/package/@ahmedsamirelsaka/react-native-local-release)  
+Version: **2.0.0-rc.1** (npm dist-tag `next`)
 
 ## Supported
 
