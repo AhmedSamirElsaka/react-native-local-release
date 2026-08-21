@@ -17,6 +17,10 @@ Written files (gitignored):
 | `secrets/*.json` | Google Play service-account key |
 | `android/app/*.jks` | Upload keystore (keep local) |
 
+On every install (and `--credentials-only`), the toolkit **creates or updates**
+`.gitignore` with a `# >>> rn-local-release` block so these paths stay untracked
+even if the project had no `.gitignore` yet.
+
 Never commit these files, paste them into chat, or screenshot their contents.
 
 ---
