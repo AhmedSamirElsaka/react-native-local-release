@@ -75,23 +75,45 @@ jobs:
         continue-on-error: true
         run: |
           set +e
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+
           if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
             echo "Publishing with NPM_TOKEN…"
-            npm publish --provenance --access public --tag next
-            exit $?
+            out=$(npm publish --provenance --access public --tag next 2>&1)
+            status=$?
+          else
+            echo "No NPM_TOKEN secret. Trying Trusted Publishing (OIDC)…"
+            out=$(npm publish --provenance --access public --tag next 2>&1)
+            status=$?
           fi
-          echo "No NPM_TOKEN secret. Trying Trusted Publishing (OIDC)…"
-          npm publish --provenance --access public --tag next
-          status=$?
-          if [ $status -ne 0 ]; then
-            echo "::warning::npm publish failed (ENEEDAUTH). Configure one of:"
-            echo "  1) Repo secret NPM_TOKEN (Automation token with publish rights), or"
-            echo "  2) npm Trusted Publishing for @ahmedsamirelsaka/react-native-local-release → this repo + workflow publish.yml + environment npm-publish"
-            echo "GitHub Release assets were still attached."
+          printf '%s\n' "$out"
+
+          if [ $status -eq 0 ]; then
+            echo "Published $PKG_NAME@$PKG_VERSION"
+            exit 0
           fi
+
+          # Idempotent: version already on the registry is success for this tag.
+          if printf '%s' "$out" | grep -qiE 'cannot publish over the previously published versions|previously published versions'; then
+            echo "::notice::$PKG_NAME@$PKG_VERSION is already on npm — treating as success."
+            npm view "$PKG_NAME@$PKG_VERSION" version
+            exit 0
+          fi
+
+          echo "::warning::npm publish failed."
+          echo "Configure NPM_TOKEN or Trusted Publishing if this was an auth error."
+          echo "GitHub Release assets were still attached."
           exit $status
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Verify package is on npm
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          npm view "$PKG_NAME@$PKG_VERSION" version
+          echo "OK: $PKG_NAME@$PKG_VERSION is available on npmjs"
 
       - name: Fail if npm did not publish
         if: steps.npm_publish.outcome != 'success'
