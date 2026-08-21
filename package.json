@@ -1,7 +1,7 @@
 {
   "name": "@ahmedsamirelsaka/react-native-local-release",
-  "version": "1.1.2",
-  "description": "Interactive local Fastlane release toolkit for React Native iOS and Android",
+  "version": "2.0.0-rc.1",
+  "description": "Security-first local Fastlane release toolkit for React Native iOS and Android",
   "type": "module",
   "license": "MIT",
   "author": {
@@ -24,30 +24,50 @@
     "testflight",
     "google-play",
     "release-automation",
-    "cli"
+    "cli",
+    "security"
   ],
   "files": [
+    "dist/",
     "install.mjs",
-    "lib/",
     "schema/",
     "template/",
+    "docs/",
     "README.md",
     "CREDENTIALS.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "bin": {
-    "rn-local-release": "./install.mjs"
+    "rn-local-release": "./dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "scripts": {
-    "install-kit": "node ./install.mjs",
-    "test": "node --test test/*.test.mjs",
-    "pack:check": "npm pack --dry-run"
+    "build": "tsc -p tsconfig.json",
+    "prepare": "npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "pack:check": "npm pack --dry-run",
+    "lint": "tsc -p tsconfig.json --noEmit"
   },
   "engines": {
     "node": ">=18"
   },
   "publishConfig": {
     "access": "public",
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org",
+    "provenance": true
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.29",
+    "typescript": "^5.8.3"
   }
 }

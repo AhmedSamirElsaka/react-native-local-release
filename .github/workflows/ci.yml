@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Node ${{ matrix.node }}
@@ -17,22 +21,47 @@ jobs:
       fail-fast: false
       matrix:
         node: [18, 20, 22]
-
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      - name: Install package metadata
+      - name: Install
         run: npm ci
 
-      - name: Run tests
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
         run: npm test
 
-      - name: Validate package contents
-        run: npm run pack:check
+      - name: Pack allowlist
+        run: |
+          npm pack
+          tar -tzf ahmedsamirelsaka-react-native-local-release-*.tgz | tee pack-list.txt
+          ! grep -E '(^[^/]+/src/|/test/|\.env$|credentials\.txt|AuthKey_|\.p8$|keystore\.jks)' pack-list.txt
+
+  scorecard:
+    name: OpenSSF Scorecard
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Run Scorecard
+        uses: ossf/scorecard-action@62b2cac7ed8198b15735ff93cb743da24b6c3d6b # v2.4.2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+        continue-on-error: true

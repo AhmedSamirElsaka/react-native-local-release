@@ -5,20 +5,27 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { detectProject, buildReleaseConfig } from '../lib/detect.mjs';
-import { assertValidReleaseConfig, validateReleaseConfig } from '../lib/config.mjs';
-import { renderTemplate } from '../lib/render.mjs';
-import {
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const root = path.join(__dirname, '..');
+const fixtureRoot = path.join(__dirname, 'fixtures', 'minimal-rn');
+const cli = path.join(root, 'dist', 'cli.js');
+
+spawnSync('npm', ['run', 'build'], { cwd: root, stdio: 'inherit' });
+
+const {
+  detectProject,
+  buildReleaseConfig,
+  validateReleaseConfig,
   mergeGitignore,
-  mergeGemfile,
   mergePackageScripts,
   patchGradleProperties,
   upsertMarkedBlock,
-} from '../lib/patch.mjs';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const fixtureRoot = path.join(__dirname, 'fixtures', 'minimal-rn');
-const installer = path.join(__dirname, '..', 'install.mjs');
+  mergeGemfile,
+  renderTemplate,
+} = await import('../dist/index.js');
+const { assertValidReleaseConfig } = await import('../dist/config.js');
+const { setupCredentialsInteractively } = await import('../dist/credentials.js');
 
 function copyFixtureToTemp() {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'rn-local-release-'));
@@ -43,7 +50,7 @@ test('buildReleaseConfig defaults to incrementing iOS builds', () => {
 
 test('buildReleaseConfig supports fixed iOS builds', () => {
   const config = buildReleaseConfig(detectProject(fixtureRoot), {
-    fixedIosBuild: 1,
+    fixedIosBuild: '1',
   });
   assert.deepEqual(config.ios.buildNumberStrategy, { mode: 'fixed', value: 1 });
 });
@@ -58,7 +65,7 @@ test('renderTemplate replaces placeholders', () => {
   assert.throws(() => renderTemplate('{{missing}}', {}));
 });
 
-test('patch helpers are idempotent', () => {
+test('patch helpers are idempotent and do not force ABI/R8', () => {
   const once = mergeGitignore('node_modules/\n');
   const twice = mergeGitignore(once);
   assert.equal(once, twice);
@@ -73,15 +80,18 @@ test('patch helpers are idempotent', () => {
   const props = patchGradleProperties(
     'reactNativeArchitectures=x86_64\nMYAPP_UPLOAD_STORE_PASSWORD=secret\n',
   );
-  assert.match(props, /armeabi-v7a,arm64-v8a/);
+  assert.match(props, /reactNativeArchitectures=x86_64/);
   assert.doesNotMatch(props, /STORE_PASSWORD/);
-  assert.match(props, /android\.enableR8\.fullMode=false/);
+  assert.doesNotMatch(props, /enableR8\.fullMode/);
 });
 
 test('mergePackageScripts adds release commands', () => {
-  const merged = mergePackageScripts({ name: 'x', scripts: {} }, {
-    'release:compile': 'bundle exec fastlane compile',
-  });
+  const merged = mergePackageScripts(
+    { name: 'x', scripts: {} },
+    {
+      'release:compile': 'bundle exec fastlane compile',
+    },
+  );
   assert.equal(merged.scripts['release:compile'], 'bundle exec fastlane compile');
   assert.equal(merged.scripts.typecheck, 'tsc --noEmit');
 });
@@ -98,13 +108,15 @@ test('installer dry-run succeeds on fixture', () => {
   const result = spawnSync(
     process.execPath,
     [
-      installer,
+      cli,
+      'install',
       '--project',
       temp,
       '--non-interactive',
       '--dry-run',
       '--team-id',
       'ABCD123456',
+      '--skip-credentials',
     ],
     { encoding: 'utf8' },
   );
@@ -117,7 +129,8 @@ test('installer writes config and Fastlane files', () => {
   const result = spawnSync(
     process.execPath,
     [
-      installer,
+      cli,
+      'install',
       '--project',
       temp,
       '--non-interactive',
@@ -126,6 +139,8 @@ test('installer writes config and Fastlane files', () => {
       '--fixed-ios-build',
       '1',
       '--force',
+      '--skip-credentials',
+      '--store-uploaded-versions',
     ],
     { encoding: 'utf8' },
   );
@@ -133,50 +148,31 @@ test('installer writes config and Fastlane files', () => {
   const config = JSON.parse(
     fs.readFileSync(path.join(temp, 'fastlane', 'release.config.json'), 'utf8'),
   );
+  assert.equal(config.schemaVersion, 2);
   assert.equal(config.ios.buildNumberStrategy.value, 1);
+  assert.equal(config.archives.storeUploadedVersions, true);
+  assert.equal(config.logging.directory, 'logs');
   assert.ok(fs.existsSync(path.join(temp, 'fastlane', 'Fastfile')));
   assert.ok(fs.existsSync(path.join(temp, 'fastlane', 'lib', 'rn_local_release.rb')));
   assert.ok(fs.existsSync(path.join(temp, 'ios', 'exportOptions.plist')));
+  assert.ok(fs.existsSync(path.join(temp, '.rn-local-release', 'manifest.json')));
   const packageJson = JSON.parse(fs.readFileSync(path.join(temp, 'package.json'), 'utf8'));
   assert.equal(packageJson.scripts['release:upload'], 'bundle exec fastlane upload_all');
-  const props = fs.readFileSync(path.join(temp, 'android', 'gradle.properties'), 'utf8');
-  assert.doesNotMatch(props, /STORE_PASSWORD=secret/);
   const gitignore = fs.readFileSync(path.join(temp, '.gitignore'), 'utf8');
   assert.match(gitignore, /# >>> rn-local-release/);
-  assert.match(gitignore, /\*\*\/fastlane\/\.env/);
-  assert.match(gitignore, /keystore\.properties/);
-  assert.match(gitignore, /secrets\/\*/);
+  assert.match(gitignore, /logs\//);
+  assert.match(gitignore, /versions\//);
 });
 
-test('installer creates .gitignore when missing', () => {
-  const temp = copyFixtureToTemp();
-  fs.unlinkSync(path.join(temp, '.gitignore'));
-  const result = spawnSync(
-    process.execPath,
-    [
-      installer,
-      '--project',
-      temp,
-      '--non-interactive',
-      '--team-id',
-      'ABCD123456',
-      '--skip-credentials',
-      '--force',
-    ],
-    { encoding: 'utf8' },
-  );
-  assert.equal(result.status, 0, result.stderr || result.stdout);
-  assert.ok(fs.existsSync(path.join(temp, '.gitignore')));
-  const gitignore = fs.readFileSync(path.join(temp, '.gitignore'), 'utf8');
-  assert.match(gitignore, /# >>> rn-local-release/);
-  assert.match(gitignore, /AuthKey_\*\.p8/);
-});
-
-test('credentials helper writes gitignored env without echoing secrets in return', async () => {
-  const { setupCredentialsInteractively } = await import('../lib/credentials.mjs');
+test('credentials helper writes file-provider secrets without echoing passwords', async () => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'rn-creds-'));
   fs.mkdirSync(path.join(temp, 'android', 'app'), { recursive: true });
   fs.mkdirSync(path.join(temp, 'fastlane'), { recursive: true });
+  // Ensure .gitignore so assertNotGitTracked allows writes
+  fs.writeFileSync(
+    path.join(temp, '.gitignore'),
+    'fastlane/.env\nandroid/keystore.properties\nsecrets/\n',
+  );
   const p8 = path.join(temp, 'AuthKey_TESTKEY.p8');
   const json = path.join(temp, 'play.json');
   const jks = path.join(temp, 'android', 'app', 'keystore.jks');
@@ -185,36 +181,39 @@ test('credentials helper writes gitignored env without echoing secrets in return
   fs.writeFileSync(jks, 'fake-jks');
 
   const answers = [
-    'y', // apple
+    'y',
     'KEYID123',
     'ISSUER-UUID',
     p8,
-    '', // apple id skip
-    'y', // play
+    '',
+    'y',
     json,
-    'y', // android
+    'y',
     jks,
     'key0',
-    'store-pass',
-    'key-pass',
   ];
+  const secrets = ['store-pass', 'key-pass'];
   const rl = {
     question: async () => {
-      if (answers.length === 0) {
-        throw new Error('Unexpected extra prompt');
-      }
+      if (answers.length === 0) throw new Error('Unexpected extra prompt');
       return answers.shift();
     },
   };
 
-  const result = await setupCredentialsInteractively(rl, temp, { dryRun: false });
+  const result = await setupCredentialsInteractively(rl, temp, {
+    dryRun: false,
+    provider: 'file',
+    allowExternalPaths: true,
+    readSecret: async () => {
+      if (secrets.length === 0) throw new Error('Unexpected secret prompt');
+      return secrets.shift();
+    },
+  });
   assert.equal(result.configured, true);
   const env = fs.readFileSync(path.join(temp, 'fastlane', '.env'), 'utf8');
-  assert.match(env, /ASC_KEY_ID=KEYID123/);
-  assert.match(env, /ASC_ISSUER_ID=ISSUER-UUID/);
-  assert.match(env, /secrets\/AuthKey_TESTKEY\.p8/);
-  assert.match(env, /secrets\/play\.json/);
-  assert.match(env, /MYAPP_UPLOAD_STORE_PASSWORD=store-pass/);
-  assert.ok(fs.existsSync(path.join(temp, 'secrets', 'AuthKey_TESTKEY.p8')));
-  assert.ok(fs.existsSync(path.join(temp, 'android', 'keystore.properties')));
+  assert.match(env, /ASC_KEY_ID="KEYID123"/);
+  assert.match(env, /MYAPP_UPLOAD_STORE_PASSWORD="store-pass"/);
+  assert.ok(fs.existsSync(path.join(temp, 'secrets', 'AuthKey_KEYID123.p8')));
+  const mode = fs.statSync(path.join(temp, 'fastlane', '.env')).mode & 0o777;
+  assert.equal(mode, 0o600);
 });

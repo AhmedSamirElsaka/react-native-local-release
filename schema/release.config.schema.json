@@ -4,8 +4,21 @@
   "title": "React Native Local Release Config",
   "type": "object",
   "additionalProperties": false,
-  "required": ["app", "ios", "android", "version", "verify", "build", "gates"],
+  "required": [
+    "schemaVersion",
+    "app",
+    "ios",
+    "android",
+    "version",
+    "verify",
+    "build",
+    "gates",
+    "credentials",
+    "logging",
+    "archives"
+  ],
   "properties": {
+    "schemaVersion": { "type": "integer", "minimum": 2 },
     "app": {
       "type": "object",
       "additionalProperties": false,
@@ -20,15 +33,18 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "enabled",
         "workspace",
         "project",
         "scheme",
         "teamId",
         "exportMethod",
         "buildNumberStrategy",
-        "outputIpaName"
+        "outputIpaName",
+        "exportOptionsPath"
       ],
       "properties": {
+        "enabled": { "type": "boolean" },
         "workspace": { "type": "string" },
         "project": { "type": "string" },
         "scheme": { "type": "string" },
@@ -54,15 +70,19 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "enabled",
         "module",
         "buildGradlePath",
+        "dsl",
         "playTrackBeta",
         "playTrackPromote",
         "aabPath"
       ],
       "properties": {
+        "enabled": { "type": "boolean" },
         "module": { "type": "string" },
         "buildGradlePath": { "type": "string" },
+        "dsl": { "type": "string", "enum": ["groovy", "kotlin"] },
         "playTrackBeta": { "type": "string" },
         "playTrackPromote": { "type": "string" },
         "aabPath": { "type": "string" },
@@ -72,7 +92,7 @@
     "version": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["sources", "defaultBump"],
+      "required": ["sources", "defaultBump", "extraFiles"],
       "properties": {
         "sources": {
           "type": "array",
@@ -88,11 +108,16 @@
                 "enum": [
                   "packageJson",
                   "androidGradle",
+                  "androidGradleKts",
                   "iosPbxproj",
                   "stringLiteral"
                 ]
               },
-              "pattern": { "type": "string" }
+              "pattern": { "type": "string" },
+              "targets": {
+                "type": "array",
+                "items": { "type": "string" }
+              }
             }
           }
         },
@@ -138,10 +163,39 @@
     "gates": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["requireCleanGitForPromote"],
+      "required": ["requireCleanGitForPromote", "requireCompileBeforeUpload"],
       "properties": {
         "requireCleanGitForPromote": { "type": "boolean" },
         "requireCompileBeforeUpload": { "type": "boolean" }
+      }
+    },
+    "credentials": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider"],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": ["keychain", "file", "env"]
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "directory"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "directory": { "type": "string" }
+      }
+    },
+    "archives": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["storeUploadedVersions", "directory"],
+      "properties": {
+        "storeUploadedVersions": { "type": "boolean" },
+        "directory": { "type": "string" }
       }
     },
     "ruby": {

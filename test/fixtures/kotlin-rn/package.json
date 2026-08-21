@@ -1,0 +1,12 @@
+{
+  "name": "kotlin-rn",
+  "version": "2.0.0",
+  "private": true,
+  "scripts": {
+    "lint": "echo lint",
+    "test": "echo test"
+  },
+  "dependencies": {
+    "react-native": "0.87.0"
+  }
+}
