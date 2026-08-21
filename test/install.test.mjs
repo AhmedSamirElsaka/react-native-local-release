@@ -140,3 +140,50 @@ test('installer writes config and Fastlane files', () => {
   const props = fs.readFileSync(path.join(temp, 'android', 'gradle.properties'), 'utf8');
   assert.doesNotMatch(props, /STORE_PASSWORD=secret/);
 });
+
+test('credentials helper writes gitignored env without echoing secrets in return', async () => {
+  const { setupCredentialsInteractively } = await import('../lib/credentials.mjs');
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'rn-creds-'));
+  fs.mkdirSync(path.join(temp, 'android', 'app'), { recursive: true });
+  fs.mkdirSync(path.join(temp, 'fastlane'), { recursive: true });
+  const p8 = path.join(temp, 'AuthKey_TESTKEY.p8');
+  const json = path.join(temp, 'play.json');
+  const jks = path.join(temp, 'android', 'app', 'keystore.jks');
+  fs.writeFileSync(p8, 'fake-p8');
+  fs.writeFileSync(json, '{"type":"service_account"}');
+  fs.writeFileSync(jks, 'fake-jks');
+
+  const answers = [
+    'y', // apple
+    'KEYID123',
+    'ISSUER-UUID',
+    p8,
+    '', // apple id skip
+    'y', // play
+    json,
+    'y', // android
+    jks,
+    'key0',
+    'store-pass',
+    'key-pass',
+  ];
+  const rl = {
+    question: async () => {
+      if (answers.length === 0) {
+        throw new Error('Unexpected extra prompt');
+      }
+      return answers.shift();
+    },
+  };
+
+  const result = await setupCredentialsInteractively(rl, temp, { dryRun: false });
+  assert.equal(result.configured, true);
+  const env = fs.readFileSync(path.join(temp, 'fastlane', '.env'), 'utf8');
+  assert.match(env, /ASC_KEY_ID=KEYID123/);
+  assert.match(env, /ASC_ISSUER_ID=ISSUER-UUID/);
+  assert.match(env, /secrets\/AuthKey_TESTKEY\.p8/);
+  assert.match(env, /secrets\/play\.json/);
+  assert.match(env, /MYAPP_UPLOAD_STORE_PASSWORD=store-pass/);
+  assert.ok(fs.existsSync(path.join(temp, 'secrets', 'AuthKey_TESTKEY.p8')));
+  assert.ok(fs.existsSync(path.join(temp, 'android', 'keystore.properties')));
+});

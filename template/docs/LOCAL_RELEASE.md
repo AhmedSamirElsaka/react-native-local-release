@@ -1,7 +1,8 @@
 # Local Fastlane release (laptop CI/CD)
 
-This project uses **react-native-local-release**: a copyable local Fastlane kit for
-React Native iOS + Android. There is no remote CI requirement. Uploads are deliberate.
+This project uses **[@ahmedsamirelsaka/react-native-local-release](https://github.com/AhmedSamirElsaka/react-native-local-release)**:
+a local Fastlane kit for React Native iOS + Android. There is no remote CI requirement.
+Uploads are deliberate.
 
 ## Split of concerns
 
@@ -12,12 +13,17 @@ React Native iOS + Android. There is no remote CI requirement. Uploads are delib
 
 Never paste private keys, passwords, or JSON credentials into Git, chat, docs, or screenshots.
 
-## Install into another RN app
+How to **create** those credentials: see [RELEASE_CREDENTIALS.md](./RELEASE_CREDENTIALS.md)
+(or the package [CREDENTIALS.md](https://github.com/AhmedSamirElsaka/react-native-local-release/blob/main/CREDENTIALS.md)).
 
-From a machine that already has this kit:
+## Install / reinstall
 
 ```bash
-node /path/to/tools/react-native-local-release/install.mjs --project /path/to/YourApp
+# From GitHub
+npx github:AhmedSamirElsaka/react-native-local-release --project .
+
+# Or GitHub Packages (after configuring @ahmedsamirelsaka registry)
+npx @ahmedsamirelsaka/react-native-local-release --project .
 ```
 
 Useful flags:
@@ -28,18 +34,14 @@ Useful flags:
 --package-name com.example.app
 --ios-scheme YourScheme
 --fixed-ios-build 1          # fixed CFBundleVersion policy
+--setup-credentials          # force interactive secret setup
+--skip-credentials           # skip secret prompts
+--credentials-only           # only write .env / keystore.properties / secrets
 --non-interactive            # fail instead of prompting when detection is incomplete
 ```
 
-Then copy credentials and validate:
-
-```bash
-cp fastlane/.env.example fastlane/.env
-cp android/keystore.properties.example android/keystore.properties
-# place secrets/*.p8 and Play JSON under secrets/
-yarn release:doctor
-yarn release:credentials
-```
+During a normal install the CLI asks whether to configure credentials now. Choosing
+**yes** walks you through Apple, Play, and keystore values and writes gitignored files.
 
 ## Prerequisites
 
@@ -109,11 +111,3 @@ Recommended flow:
 - No automatic production publish on every build
 - No automatic store metadata / screenshot sync
 - No `match` certificate repo (uses local Xcode automatic signing)
-
-## Planned / optional enhancements
-
-- Optional physical-device Release smoke test before upload (compile cannot prove launch safety)
-- Re-enable Crashlytics Android mapping upload after Gradle plugin compatibility is verified
-- Optional `bundletool` get-size estimates and stricter size budgets in `release.config.json`
-- Optional `match` for multi-machine Apple signing
-- Publish the kit as a versioned npm package once it has been reused across several apps

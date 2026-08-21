@@ -17,6 +17,7 @@ import {
   ensureRubyVersion,
 } from './lib/patch.mjs';
 import { copyFile, exists, readText, writeText, ensureDir } from './lib/fs.mjs';
+import { askYesNo, setupCredentialsInteractively } from './lib/credentials.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATE_ROOT = path.join(__dirname, 'template');
@@ -27,6 +28,8 @@ function parseArgs(argv) {
     dryRun: false,
     nonInteractive: false,
     force: false,
+    setupCredentials: null,
+    credentialsOnly: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -44,6 +47,16 @@ function parseArgs(argv) {
         break;
       case '--force':
         options.force = true;
+        break;
+      case '--setup-credentials':
+        options.setupCredentials = true;
+        break;
+      case '--skip-credentials':
+        options.setupCredentials = false;
+        break;
+      case '--credentials-only':
+        options.credentialsOnly = true;
+        options.setupCredentials = true;
         break;
       case '--team-id':
         options.teamId = next;
@@ -101,10 +114,17 @@ Options:
   --ios-workspace <path>   Relative ios/*.xcworkspace path
   --ios-scheme <name>      Xcode scheme
   --fixed-ios-build <n>    Keep iOS CFBundleVersion fixed (e.g. 1)
+  --setup-credentials      Always run interactive credential setup
+  --skip-credentials       Never prompt for credential setup
+  --credentials-only       Only write credentials (skip file generation)
   --dry-run                Print actions without writing
   --non-interactive        Fail instead of prompting
   --force                  Overwrite generated Fastlane files
   -h, --help               Show help
+
+Interactive install asks whether to configure Apple / Play / keystore credentials
+and writes gitignored fastlane/.env + android/keystore.properties.
+See CREDENTIALS.md for how to create each credential.
 `);
 }
 
@@ -194,6 +214,26 @@ function copyTemplateTree(relativeDir, projectRoot, { dryRun, force }) {
   return actions;
 }
 
+async function maybeSetupCredentials(rl, options, projectRoot) {
+  if (options.setupCredentials === false || options.nonInteractive) {
+    return { configured: false, skipped: true };
+  }
+  if (options.setupCredentials === true) {
+    return setupCredentialsInteractively(rl, projectRoot, { dryRun: options.dryRun });
+  }
+  const wants = await askYesNo(
+    rl,
+    'Configure Apple / Play / keystore credentials now so the install is fully workable?',
+    true,
+  );
+  if (!wants) {
+    console.log('Skipped credential setup. You can run later:');
+    console.log('  rn-local-release --project . --credentials-only');
+    return { configured: false, skipped: true };
+  }
+  return setupCredentialsInteractively(rl, projectRoot, { dryRun: options.dryRun });
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
@@ -202,11 +242,23 @@ async function main() {
   }
 
   const projectRoot = options.project;
+  if (!exists(projectRoot)) {
+    throw new Error(`Project path does not exist: ${projectRoot}`);
+  }
+
   const rl = options.nonInteractive
     ? null
     : readline.createInterface({ input, output });
 
   try {
+    if (options.credentialsOnly) {
+      if (options.nonInteractive) {
+        throw new Error('--credentials-only requires an interactive terminal (omit --non-interactive).');
+      }
+      await setupCredentialsInteractively(rl, projectRoot, { dryRun: options.dryRun });
+      return;
+    }
+
     let detection = detectProject(projectRoot, options);
 
     if (!detection.android.supported) {
@@ -237,19 +289,6 @@ async function main() {
 
     const actions = [];
 
-    // Copy static template files
-    for (const dir of [
-      'fastlane',
-      'fastlane/lib',
-      'docs',
-      'android',
-      'ios',
-      'scripts',
-      'secrets',
-    ]) {
-      // copy only files under each; recursive helper handles nesting via listing
-    }
-
     const copyRoots = ['fastlane', 'docs', 'android', 'ios', 'scripts', 'secrets'];
     for (const rootName of copyRoots) {
       actions.push(
@@ -258,6 +297,19 @@ async function main() {
           force: options.force,
         }),
       );
+    }
+
+    // Also ship CREDENTIALS.md into the target docs folder when present in package root
+    const credentialsDocSrc = path.join(__dirname, 'CREDENTIALS.md');
+    const credentialsDocDest = path.join(projectRoot, 'docs', 'RELEASE_CREDENTIALS.md');
+    if (exists(credentialsDocSrc)) {
+      if (options.dryRun) {
+        actions.push({ type: 'copy', path: credentialsDocDest, dryRun: true });
+      } else {
+        ensureDir(path.dirname(credentialsDocDest));
+        copyFile(credentialsDocSrc, credentialsDocDest);
+        actions.push({ type: 'copy', path: credentialsDocDest });
+      }
     }
 
     // Render Appfile + exportOptions + release.config.json
@@ -356,12 +408,18 @@ async function main() {
         console.warn(`  - ${item}`);
       }
     }
+
+    const credResult = await maybeSetupCredentials(rl, options, projectRoot);
+
     if (options.dryRun) {
       console.log('Dry run only — no files were written.');
+    } else if (credResult.configured) {
+      console.log('Next: bundle install && yarn release:doctor && yarn release:credentials');
     } else {
       console.log('Next:');
-      console.log('  1. cp fastlane/.env.example fastlane/.env  # fill credentials');
-      console.log('  2. cp android/keystore.properties.example android/keystore.properties');
+      console.log('  1. Read docs/RELEASE_CREDENTIALS.md (how to create keys)');
+      console.log('  2. rn-local-release --project . --credentials-only');
+      console.log('     or copy fastlane/.env.example → fastlane/.env and fill values');
       console.log('  3. bundle install && yarn release:doctor && yarn release:credentials');
     }
   } finally {

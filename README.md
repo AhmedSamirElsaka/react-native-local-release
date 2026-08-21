@@ -22,7 +22,7 @@ that can be reused safely.
 ## Features
 
 - Interactive project detection for Android and iOS metadata
-- Credentials-only onboarding after installation
+- **Interactive credential setup during install** (optional, gitignored files only)
 - Config-driven Fastlane lanes with no app-specific IDs in lane code
 - Build both platforms before uploading either
 - SHA-256 release manifest to prevent stale artifact uploads
@@ -36,8 +36,8 @@ that can be reused safely.
 ## Release flow
 
 ```text
-detect project → generate config → doctor → prepare version
-              → compile IPA + AAB → checksum manifest
+detect project → generate config → optional credential setup → doctor
+              → prepare version → compile IPA + AAB → checksum manifest
               → TestFlight + Play internal → explicit production promotion
 ```
 
@@ -47,7 +47,13 @@ device before promoting it.
 
 ## Installation
 
-### From source
+### From Git (easiest)
+
+```bash
+npx github:AhmedSamirElsaka/react-native-local-release --project /path/to/YourReactNativeApp
+```
+
+Or clone once and reuse:
 
 ```bash
 git clone https://github.com/AhmedSamirElsaka/react-native-local-release.git
@@ -56,17 +62,21 @@ node react-native-local-release/install.mjs --project /path/to/YourReactNativeAp
 
 ### From GitHub Packages
 
-Configure the GitHub npm registry and authenticate with a token that can read
-packages:
-
 ```bash
+# One-time: PAT with read:packages
+echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN" >> ~/.npmrc
 npm config set @ahmedsamirelsaka:registry https://npm.pkg.github.com
+
 npx @ahmedsamirelsaka/react-native-local-release --project /path/to/YourReactNativeApp
 ```
 
-The installer auto-detects the package name, Xcode workspace/project, scheme,
-bundle identifier, team ID, package manager, and current versions. If detection is
-ambiguous, it asks for the missing value.
+The installer:
+
+1. Detects package name, workspace/scheme, team ID, and versions
+2. Writes Fastlane config + scripts
+3. Asks: **Configure Apple / Play / keystore credentials now?**
+4. If you choose **yes**, prompts for keys/paths/passwords and writes gitignored files
+5. Copies key material into `secrets/` (and keystore into `android/app/` when needed)
 
 Useful options:
 
@@ -75,37 +85,54 @@ rn-local-release --project . --dry-run
 rn-local-release --project . --team-id YOURTEAMID
 rn-local-release --project . --ios-scheme YourScheme
 rn-local-release --project . --fixed-ios-build 1
+rn-local-release --project . --setup-credentials   # force credential prompts
+rn-local-release --project . --skip-credentials    # never prompt for secrets
+rn-local-release --project . --credentials-only    # only write secrets
 rn-local-release --project . --non-interactive
 ```
 
 Kotlin DSL (`android/app/build.gradle.kts`) is intentionally rejected for now;
 the Android installer currently supports the default React Native Groovy layout.
 
+## How to get credentials
+
+Step-by-step creation of App Store Connect API keys, Play service accounts, and
+Android upload keystores:
+
+**→ [CREDENTIALS.md](./CREDENTIALS.md)**
+
+After install, the same guide is copied into the app as
+`docs/RELEASE_CREDENTIALS.md`.
+
 ## Credential setup
 
-After installation:
+### Interactive (recommended)
+
+Say **yes** when the installer asks, or run later:
 
 ```bash
 cd /path/to/YourReactNativeApp
-cp fastlane/.env.example fastlane/.env
-cp android/keystore.properties.example android/keystore.properties
+npx @ahmedsamirelsaka/react-native-local-release --project . --credentials-only
 ```
 
-Provide locally:
+### Manual
 
-- App Store Connect API key ID, issuer ID, and `.p8` file
-- Google Play service-account JSON file
-- Android upload keystore, alias, and passwords
-- A valid local Apple Distribution certificate/provisioning profile
+```bash
+cp fastlane/.env.example fastlane/.env
+cp android/keystore.properties.example android/keystore.properties
+# place secrets/*.p8 and Play JSON under secrets/
+```
 
-Credential files, keystores, store artifacts, and manifests are added to
-`.gitignore`. The installer never prints credential values.
+Then validate:
 
 ```bash
 bundle install
 yarn release:doctor
 yarn release:credentials
 ```
+
+Credential files, keystores, store artifacts, and manifests are added to
+`.gitignore`. The installer never prints credential values after entry.
 
 ## Commands installed in the target project
 
@@ -130,6 +157,7 @@ working tree.
 - `android/keystore.properties.example`
 - `ios/exportOptions.plist`
 - `docs/LOCAL_RELEASE.md`
+- `docs/RELEASE_CREDENTIALS.md`
 - `scripts/print-android-signing-fingerprints.sh`
 - secure `.gitignore` rules and `secrets/` layout
 
