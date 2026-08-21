@@ -10,7 +10,7 @@ import { renderTemplate, jsonPretty } from './lib/render.mjs';
 import {
   mergePackageScripts,
   mergeGemfile,
-  mergeGitignore,
+  ensureProjectGitignore,
   patchAndroidBuildGradle,
   patchGradleProperties,
   writeWithBackup,
@@ -255,6 +255,7 @@ async function main() {
       if (options.nonInteractive) {
         throw new Error('--credentials-only requires an interactive terminal (omit --non-interactive).');
       }
+      ensureProjectGitignore(projectRoot, { dryRun: options.dryRun });
       await setupCredentialsInteractively(rl, projectRoot, { dryRun: options.dryRun });
       return;
     }
@@ -372,12 +373,8 @@ async function main() {
       }),
     );
 
-    // gitignore
-    const gitignorePath = path.join(projectRoot, '.gitignore');
-    if (exists(gitignorePath)) {
-      const mergedIgnore = mergeGitignore(readText(gitignorePath));
-      actions.push(writeWithBackup(gitignorePath, mergedIgnore, { dryRun: options.dryRun }));
-    }
+    // Always create/update .gitignore so credentials stay untracked by default
+    actions.push(ensureProjectGitignore(projectRoot, { dryRun: options.dryRun }));
 
     // Android patches
     const gradlePath = path.join(projectRoot, config.android.buildGradlePath);

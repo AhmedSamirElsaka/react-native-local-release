@@ -62,6 +62,8 @@ test('patch helpers are idempotent', () => {
   const once = mergeGitignore('node_modules/\n');
   const twice = mergeGitignore(once);
   assert.equal(once, twice);
+  assert.match(once, /fastlane\/\.env/);
+  assert.match(once, /\*\.rn-local-release\.bak/);
 
   const gemOnce = mergeGemfile('source "https://rubygems.org"\nruby ">= 2.6.10"\n');
   const gemTwice = mergeGemfile(gemOnce);
@@ -139,6 +141,35 @@ test('installer writes config and Fastlane files', () => {
   assert.equal(packageJson.scripts['release:upload'], 'bundle exec fastlane upload_all');
   const props = fs.readFileSync(path.join(temp, 'android', 'gradle.properties'), 'utf8');
   assert.doesNotMatch(props, /STORE_PASSWORD=secret/);
+  const gitignore = fs.readFileSync(path.join(temp, '.gitignore'), 'utf8');
+  assert.match(gitignore, /# >>> rn-local-release/);
+  assert.match(gitignore, /\*\*\/fastlane\/\.env/);
+  assert.match(gitignore, /keystore\.properties/);
+  assert.match(gitignore, /secrets\/\*/);
+});
+
+test('installer creates .gitignore when missing', () => {
+  const temp = copyFixtureToTemp();
+  fs.unlinkSync(path.join(temp, '.gitignore'));
+  const result = spawnSync(
+    process.execPath,
+    [
+      installer,
+      '--project',
+      temp,
+      '--non-interactive',
+      '--team-id',
+      'ABCD123456',
+      '--skip-credentials',
+      '--force',
+    ],
+    { encoding: 'utf8' },
+  );
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.ok(fs.existsSync(path.join(temp, '.gitignore')));
+  const gitignore = fs.readFileSync(path.join(temp, '.gitignore'), 'utf8');
+  assert.match(gitignore, /# >>> rn-local-release/);
+  assert.match(gitignore, /AuthKey_\*\.p8/);
 });
 
 test('credentials helper writes gitignored env without echoing secrets in return', async () => {

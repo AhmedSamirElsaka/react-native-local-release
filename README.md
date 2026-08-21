@@ -22,6 +22,7 @@ that can be reused safely.
 ## Features
 
 - Interactive project detection for Android and iOS metadata
+- **Always updates `.gitignore`** so credentials, keystores, IPA/AAB, and secrets stay untracked
 - **Interactive credential setup during install** (optional, gitignored files only)
 - Config-driven Fastlane lanes with no app-specific IDs in lane code
 - Build both platforms before uploading either
@@ -131,8 +132,10 @@ yarn release:doctor
 yarn release:credentials
 ```
 
-Credential files, keystores, store artifacts, and manifests are added to
-`.gitignore`. The installer never prints credential values after entry.
+On every install (and on `--credentials-only`), the toolkit creates or updates
+`.gitignore` with a marked `rn-local-release` block covering `.env`, keystores,
+`secrets/*`, IPA/AAB, and release manifests. The installer never prints credential
+values after entry.
 
 ## Commands installed in the target project
 
