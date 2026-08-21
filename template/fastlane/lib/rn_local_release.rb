@@ -613,6 +613,9 @@ def upload_ios!(options = {})
     changelog: options[:changelog]
   )
   archive_uploaded_version!(:ios)
+rescue StandardError => e
+  log_release_error!("iOS upload failed", e)
+  raise
 end
 
 def upload_android!
@@ -629,6 +632,9 @@ def upload_android!
     release_status: config.dig("android", "releaseStatus") || "completed"
   )
   archive_uploaded_version!(:android)
+rescue StandardError => e
+  log_release_error!("Android upload failed", e)
+  raise
 end
 
 def upload_all_resumable!(options = {})
