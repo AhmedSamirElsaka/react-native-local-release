@@ -1,0 +1,186 @@
+# frozen_string_literal: true
+
+opt_out_usage
+default_platform(:ios)
+
+import("./lib/rn_local_release.rb")
+
+desc "Validate config paths and print current versions (no secrets required)"
+lane :doctor do
+  doctor!
+end
+
+desc "Validate Apple and Google upload credentials"
+lane :credentials do
+  load_asc_api_key
+  UI.success("App Store Connect API key loaded successfully.")
+  validate_play_store_json_key(json_key: play_json_key_path)
+  UI.success("Play Store JSON key validated successfully.")
+end
+
+desc "Run shared JS verification"
+lane :verify do
+  run_verify!
+end
+
+desc "Bump / set marketing version + Android versionCode (and iOS build per strategy)"
+lane :bump_version do |options|
+  bumped = bump_versions!(options)
+  UI.message(
+    "Next store upload will use #{bumped[:version]} " \
+    "(Android #{bumped[:android_build]}, iOS #{bumped[:ios_build]})"
+  )
+end
+
+desc "Alias of bump_version for prepare-before-build workflows"
+lane :prepare do |options|
+  bumped = bump_versions!(options)
+  UI.message(
+    "Prepared #{bumped[:version]} " \
+    "(Android #{bumped[:android_build]}, iOS #{bumped[:ios_build]})"
+  )
+end
+
+desc "Typecheck and compile iOS IPA + Android AAB without uploading"
+lane :compile do
+  compile_all!
+end
+
+desc "Build iOS IPA and Android AAB without uploading"
+lane :build_all do
+  compile_all!
+end
+
+desc "Upload previously compiled IPA + AAB using release-manifest.json"
+lane :upload_all do |options|
+  assert_manifest_artifacts!
+  upload_ios!(options)
+  upload_android!
+end
+
+desc "Bump (unless skipped), compile both platforms, then upload TestFlight + Play beta track"
+lane :beta_all do |options|
+  unless skip_flag?(options, :skip_bump)
+    bumped = bump_versions!(options)
+    UI.important(
+      "Version is now #{bumped[:version]} " \
+      "(Android #{bumped[:android_build]}, iOS #{bumped[:ios_build]}). Compiling, then uploading."
+    )
+  else
+    UI.important(
+      "Using current version #{current_marketing_version} " \
+      "(Android #{current_android_build}, iOS #{current_ios_build}). " \
+      "Compiling, then uploading."
+    )
+  end
+
+  compile_all!
+  upload_ios!(options)
+  upload_android!
+end
+
+platform :ios do
+  desc "Validate App Store Connect API credentials"
+  lane :credentials do
+    load_asc_api_key
+    UI.success("App Store Connect API key loaded successfully.")
+  end
+
+  desc "Run lint, TypeScript, and tests"
+  lane :verify do
+    run_verify!
+  end
+
+  desc "Build a signed App Store IPA (no upload)"
+  lane :build do
+    compile_js!
+    build_ios_ipa!
+  end
+
+  desc "Compile IPA then upload to TestFlight"
+  lane :beta do |options|
+    bump_versions!(options) unless skip_flag?(options, :skip_bump)
+    compile_js!
+    build_ios_ipa!
+    upload_ios!(options)
+  end
+
+  desc "Upload an already-compiled IPA from the release manifest"
+  lane :upload do |options|
+    assert_manifest_artifacts!
+    upload_ios!(options)
+  end
+
+  desc "Submit an already-uploaded build for App Store review"
+  lane :promote do |options|
+    ensure_clean_git!
+    load_asc_api_key
+    app_version = require_option!(options, :version)
+    build_number = require_option!(options, :build)
+
+    upload_to_app_store(
+      app_version: app_version,
+      build_number: build_number.to_s,
+      submit_for_review: true,
+      automatic_release: false,
+      force: true,
+      skip_binary_upload: true,
+      skip_metadata: true,
+      skip_screenshots: true,
+      precheck_include_in_app_purchases: false
+    )
+  end
+end
+
+platform :android do
+  desc "Validate Google Play service-account credentials"
+  lane :credentials do
+    validate_play_store_json_key(json_key: play_json_key_path)
+    UI.success("Play Store JSON key validated successfully.")
+  end
+
+  desc "Run lint, TypeScript, and tests"
+  lane :verify do
+    run_verify!
+  end
+
+  desc "Build a signed Play App Bundle (no upload)"
+  lane :build do
+    compile_js!
+    build_android_aab!
+  end
+
+  desc "Compile AAB then upload to the configured Play beta track"
+  lane :beta do |options|
+    bump_versions!(options) unless skip_flag?(options, :skip_bump)
+    compile_js!
+    build_android_aab!
+    upload_android!
+  end
+
+  desc "Upload an already-compiled AAB from the release manifest"
+  lane :upload do
+    assert_manifest_artifacts!
+    upload_android!
+  end
+
+  desc "Promote a specific versionCode from beta track to production"
+  lane :promote do |options|
+    ensure_clean_git!
+    version_code = require_option!(options, :version_code)
+
+    upload_to_play_store(
+      package_name: config.dig("app", "packageName"),
+      track: config.dig("android", "playTrackBeta"),
+      track_promote_to: config.dig("android", "playTrackPromote"),
+      version_code: version_code.to_i,
+      json_key: play_json_key_path,
+      skip_upload_apk: true,
+      skip_upload_aab: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+      skip_upload_changelogs: true
+    )
+  end
+end

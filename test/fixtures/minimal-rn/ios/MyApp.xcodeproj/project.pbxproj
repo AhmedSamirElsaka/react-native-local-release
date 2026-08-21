@@ -1,0 +1,9 @@
+// !$*UTF8*$!
+{
+	buildSettings = {
+		PRODUCT_BUNDLE_IDENTIFIER = com.example.minimal;
+		DEVELOPMENT_TEAM = ABCD123456;
+		MARKETING_VERSION = 1.2.3;
+		CURRENT_PROJECT_VERSION = 10;
+	};
+}

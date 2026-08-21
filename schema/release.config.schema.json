@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AhmedSamirElsaka/react-native-local-release/blob/main/schema/release.config.schema.json",
+  "title": "React Native Local Release Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["app", "ios", "android", "version", "verify", "build", "gates"],
+  "properties": {
+    "app": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["displayName", "packageName", "bundleIdentifier"],
+      "properties": {
+        "displayName": { "type": "string", "minLength": 1 },
+        "packageName": { "type": "string", "minLength": 1 },
+        "bundleIdentifier": { "type": "string", "minLength": 1 }
+      }
+    },
+    "ios": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "workspace",
+        "project",
+        "scheme",
+        "teamId",
+        "exportMethod",
+        "buildNumberStrategy",
+        "outputIpaName"
+      ],
+      "properties": {
+        "workspace": { "type": "string" },
+        "project": { "type": "string" },
+        "scheme": { "type": "string" },
+        "teamId": { "type": "string", "minLength": 1 },
+        "exportMethod": {
+          "type": "string",
+          "enum": ["app-store", "ad-hoc", "enterprise", "development"]
+        },
+        "buildNumberStrategy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["increment", "fixed"] },
+            "value": { "type": "integer", "minimum": 1 }
+          }
+        },
+        "outputIpaName": { "type": "string" },
+        "exportOptionsPath": { "type": "string" }
+      }
+    },
+    "android": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "module",
+        "buildGradlePath",
+        "playTrackBeta",
+        "playTrackPromote",
+        "aabPath"
+      ],
+      "properties": {
+        "module": { "type": "string" },
+        "buildGradlePath": { "type": "string" },
+        "playTrackBeta": { "type": "string" },
+        "playTrackPromote": { "type": "string" },
+        "aabPath": { "type": "string" },
+        "releaseStatus": { "type": "string" }
+      }
+    },
+    "version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sources", "defaultBump"],
+      "properties": {
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "kind"],
+            "properties": {
+              "path": { "type": "string" },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "packageJson",
+                  "androidGradle",
+                  "iosPbxproj",
+                  "stringLiteral"
+                ]
+              },
+              "pattern": { "type": "string" }
+            }
+          }
+        },
+        "defaultBump": { "type": "string", "enum": ["patch", "minor", "major"] },
+        "extraFiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "kind"],
+            "properties": {
+              "path": { "type": "string" },
+              "kind": { "type": "string", "enum": ["stringLiteral"] },
+              "pattern": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "verify": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["install", "commands"],
+      "properties": {
+        "install": { "type": "string" },
+        "commands": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "build": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["iosOutputDir", "typecheckCommand"],
+      "properties": {
+        "iosOutputDir": { "type": "string" },
+        "typecheckCommand": { "type": "string" },
+        "maxAabSizeMb": { "type": ["number", "null"] },
+        "maxIpaSizeMb": { "type": ["number", "null"] }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requireCleanGitForPromote"],
+      "properties": {
+        "requireCleanGitForPromote": { "type": "boolean" },
+        "requireCompileBeforeUpload": { "type": "boolean" }
+      }
+    },
+    "ruby": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "name": "@ahmedsamirelsaka/react-native-local-release",
+  "version": "1.0.0",
+  "description": "Interactive local Fastlane release toolkit for React Native iOS and Android",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "Ahmed Samir Elsaka",
+    "url": "https://github.com/AhmedSamirElsaka"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AhmedSamirElsaka/react-native-local-release.git"
+  },
+  "homepage": "https://github.com/AhmedSamirElsaka/react-native-local-release#readme",
+  "bugs": {
+    "url": "https://github.com/AhmedSamirElsaka/react-native-local-release/issues"
+  },
+  "keywords": [
+    "react-native",
+    "fastlane",
+    "ios",
+    "android",
+    "testflight",
+    "google-play",
+    "release-automation",
+    "cli"
+  ],
+  "files": [
+    "install.mjs",
+    "lib/",
+    "schema/",
+    "template/",
+    "README.md",
+    "LICENSE"
+  ],
+  "bin": {
+    "rn-local-release": "./install.mjs"
+  },
+  "scripts": {
+    "install-kit": "node ./install.mjs",
+    "test": "node --test test/*.test.mjs",
+    "pack:check": "npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://npm.pkg.github.com"
+  }
+}
