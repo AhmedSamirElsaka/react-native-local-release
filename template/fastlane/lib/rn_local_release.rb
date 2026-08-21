@@ -122,12 +122,65 @@ def load_keystore_properties
   props
 end
 
+def keychain_service_name
+  "rn-local-release:#{File.basename(repo_root)}"
+end
+
+def keychain_get(account)
+  return nil unless FastlaneCore::Helper.mac?
+
+  out, status = Open3.capture2(
+    "security",
+    "find-generic-password",
+    "-s",
+    keychain_service_name,
+    "-a",
+    account,
+    "-w"
+  )
+  return nil unless status.success?
+
+  value = out.to_s.strip
+  value.empty? ? nil : value
+rescue StandardError
+  nil
+end
+
+# Keychain provider stores passwords in macOS Keychain and intentionally leaves
+# them blank in fastlane/.env + android/keystore.properties. Yarn release:*
+# invokes Fastlane directly, so Fastlane must materialize them itself.
+def materialize_keychain_secrets!
+  return unless config.dig("credentials", "provider").to_s == "keychain"
+  return unless FastlaneCore::Helper.mac?
+
+  {
+    "MYAPP_UPLOAD_STORE_PASSWORD" => keychain_get("MYAPP_UPLOAD_STORE_PASSWORD"),
+    "MYAPP_UPLOAD_KEY_PASSWORD" => keychain_get("MYAPP_UPLOAD_KEY_PASSWORD"),
+    "MYAPP_UPLOAD_KEY_ALIAS" => keychain_get("MYAPP_UPLOAD_KEY_ALIAS"),
+    "ASC_KEY_ID" => keychain_get("ASC_KEY_ID"),
+    "ASC_ISSUER_ID" => keychain_get("ASC_ISSUER_ID")
+  }.each do |key, value|
+    next if value.nil? || value.empty?
+    next unless ENV[key].to_s.strip.empty?
+
+    ENV[key] = value
+  end
+end
+
 def signing_value(name, default: nil)
+  materialize_keychain_secrets!
+
   from_env = ENV[name].to_s.strip
+  # dotenv / Keychain installs may leave literal empty quotes in .env
+  from_env = "" if from_env == '""' || from_env == "''"
   return from_env unless from_env.empty?
 
   from_file = load_keystore_properties[name].to_s.strip
+  from_file = "" if from_file == '""' || from_file == "''"
   return from_file unless from_file.empty?
+
+  from_keychain = keychain_get(name)
+  return from_keychain unless from_keychain.nil? || from_keychain.empty?
 
   return default unless default.nil?
 
@@ -135,6 +188,7 @@ def signing_value(name, default: nil)
 end
 
 def apply_android_signing_env!
+  materialize_keychain_secrets!
   {
     "MYAPP_UPLOAD_STORE_FILE" => signing_value("MYAPP_UPLOAD_STORE_FILE", default: "keystore.jks"),
     "MYAPP_UPLOAD_STORE_PASSWORD" => signing_value("MYAPP_UPLOAD_STORE_PASSWORD"),

@@ -41,6 +41,15 @@ function copyFixture(name) {
   return dest;
 }
 
+
+test('Fastlane template materializes Keychain signing secrets', () => {
+  const rb = fs.readFileSync(path.join(root, 'template/fastlane/lib/rn_local_release.rb'), 'utf8');
+  assert.match(rb, /def materialize_keychain_secrets!/);
+  assert.match(rb, /def keychain_get\(account\)/);
+  assert.match(rb, /find-generic-password/);
+  assert.match(rb, /MYAPP_UPLOAD_STORE_PASSWORD/);
+});
+
 test('path containment rejects traversal', () => {
   assert.throws(() => assertSafeRelativePath('../etc/passwd'));
   assert.throws(() => assertSafeRelativePath('/abs'));

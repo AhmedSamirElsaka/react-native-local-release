@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0-rc.3
+
+- Fix: Fastlane now materializes Android signing passwords from macOS Keychain when `credentials.provider` is `keychain`.
+  `yarn release:beta` (direct Fastlane) no longer fails with `Missing MYAPP_UPLOAD_STORE_PASSWORD` after a Keychain install.
+- Treat literal empty quotes in `.env` / `keystore.properties` as empty values.
+
 ## 2.0.0-rc.2
 
 - Remove maintainer-only `docs/PUBLISHING.md` from the published package and GitHub tree.
@@ -28,7 +34,7 @@ Security-first rewrite for bare React Native apps (release candidate).
 - CI: SHA-pinned actions, npm provenance publish workflow, Dependabot.
 
 ### Migration
-1. Install `2.0.0-rc.2` (or newer) from npm (dist-tag `next`).
+1. Install `2.0.0-rc.3` (or newer) from npm (dist-tag `next`).
 2. Run `rn-local-release migrate --project .` (or reinstall; existing config is merged).
 3. Prefer Keychain credentials: `rn-local-release configure --project .`
 4. Confirm `.gitignore` includes `logs/`, `versions/`, and the marked credential block.
