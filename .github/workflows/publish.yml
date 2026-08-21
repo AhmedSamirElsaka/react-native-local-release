@@ -18,6 +18,8 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Create a protected GitHub Environment named "npm-publish" for Trusted Publishing.
+    # Until then, publishing still works with repository secret NPM_TOKEN.
     environment: npm-publish
     permissions:
       contents: write
@@ -37,6 +39,7 @@ jobs:
         run: npm ci
 
       - name: Verify version matches tag
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           PKG_VERSION=$(node -p "require('./package.json').version")
           TAG=${GITHUB_REF_NAME#v}
@@ -57,17 +60,27 @@ jobs:
           npx --yes @cyclonedx/cyclonedx-npm@3.0.0 --output-file sbom.cdx.json || true
 
       - name: Publish to npmjs with provenance
-        run: npm publish --provenance --access public
+        run: |
+          if [ -n "${NODE_AUTH_TOKEN:-}" ]; then
+            npm publish --provenance --access public
+          else
+            echo "No NPM_TOKEN — attempting Trusted Publishing (OIDC)…"
+            npm publish --provenance --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Attach artifacts to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef650f79 # v2.2.1
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8aa5b2ef267fda # v2.2.1
         with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
           files: |
             ${{ env.TARBALL }}
             checksums.sha256
             sbom.cdx.json
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

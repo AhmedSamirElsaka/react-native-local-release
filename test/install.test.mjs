@@ -178,7 +178,8 @@ test('credentials helper writes file-provider secrets without echoing passwords'
   const jks = path.join(temp, 'android', 'app', 'keystore.jks');
   fs.writeFileSync(p8, 'fake-p8');
   fs.writeFileSync(json, '{"type":"service_account"}');
-  fs.writeFileSync(jks, 'fake-jks');
+  fs.writeFileSync(jks, 'fake-jks', { mode: 0o600 });
+  fs.chmodSync(jks, 0o600);
 
   const answers = [
     'y',

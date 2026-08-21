@@ -286,6 +286,8 @@ export async function setupCredentialsInteractively(
       if (path.resolve(source) !== path.resolve(appDest)) {
         copyFileSecure(source, appDest, 0o600);
       } else {
+        // Already in place — harden mode instead of failing on default umask 0644.
+        fs.chmodSync(appDest, 0o600);
         assertOwnerOnlyReadable(appDest);
       }
       values.MYAPP_UPLOAD_STORE_FILE = base;

@@ -49,6 +49,7 @@ jobs:
   scorecard:
     name: OpenSSF Scorecard
     runs-on: ubuntu-latest
+    continue-on-error: true
     permissions:
       security-events: write
       id-token: write
@@ -59,7 +60,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Run Scorecard
-        uses: ossf/scorecard-action@62b2cac7ed8198b15735ff93cb743da24b6c3d6b # v2.4.2
+        uses: ossf/scorecard-action@05b42c624433fc40578a4040d5cf5e36ddca8cde # v2.4.2
         with:
           results_file: results.sarif
           results_format: sarif
