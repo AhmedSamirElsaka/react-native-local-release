@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { runInstall, runUninstall } from './install.js';
@@ -210,9 +211,20 @@ async function runAudit(project: string): Promise<void> {
   const candidates = [
     'fastlane/.env',
     'android/keystore.properties',
-    'secrets',
+    'secrets/.gitignore',
+    'secrets/README.md',
   ];
+  // Also audit concrete secret files when present
+  const secretsDir = path.join(root, 'secrets');
+  if (exists(secretsDir)) {
+    for (const name of fs.readdirSync(secretsDir)) {
+      if (name === '.gitignore' || name === 'README.md') continue;
+      if (name.endsWith('.bak')) continue;
+      candidates.push(`secrets/${name}`);
+    }
+  }
   console.log('Credential audit');
+  let failures = 0;
   for (const rel of candidates) {
     const absolute = path.join(root, rel);
     if (!exists(absolute)) {
@@ -221,10 +233,21 @@ async function runAudit(project: string): Promise<void> {
     }
     const tracked = runArgv('git', ['ls-files', '--error-unmatch', rel], { cwd: root });
     const ignored = runArgv('git', ['check-ignore', '-q', rel], { cwd: root });
+    const isTracked = tracked.status === 0;
+    // README/.gitignore under secrets may be intentionally tracked
+    const allowTracked = rel === 'secrets/.gitignore' || rel === 'secrets/README.md';
+    const isIgnored = ignored.status === 0;
+    if (!allowTracked && (isTracked || !isIgnored)) failures += 1;
     console.log(
-      `  ${rel}: tracked=${tracked.status === 0} ignored=${ignored.status === 0}`,
+      `  ${rel}: tracked=${isTracked} ignored=${isIgnored}${
+        !allowTracked && (isTracked || !isIgnored) ? ' ⚠' : ''
+      }`,
     );
   }
+  if (failures > 0) {
+    throw new Error(`Credential audit failed for ${failures} path(s). Update .gitignore or untrack secrets.`);
+  }
+  console.log('Audit passed.');
 }
 
 async function main(): Promise<void> {
